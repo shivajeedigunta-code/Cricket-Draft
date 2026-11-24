@@ -516,6 +516,8 @@ let LOCAL={};
 try{LOCAL=JSON.parse(localStorage.getItem(LOCALSTORE))||{}}catch(e){}
 function saveLocal(){try{localStorage.setItem(LOCALSTORE,JSON.stringify(LOCAL))}catch(e){}}
 
+let connected=false, dbError="";
+function showDbError(e){dbError=String(e&&(e.code||e.message)||e);render();}
 let MODE="loading", db=null, me=null, owner=false, editor=false, stale=false;
 const DR={}, PK={}, SUBS={};
 let confirmNew=false, busy=false, toastMsg="", toastTimer=null;
@@ -557,7 +559,7 @@ function subscribeAll(){
         }
       }
       render();
-    },e=>{toast("Couldn't load the shared draft ("+(e&&e.code||"error")+").");});
+    },e=>showDbError(e));
   }
 }
 let loadTimer=null;
@@ -569,10 +571,11 @@ async function boot(){
   MODE="shared";
   // whoever opens a new league link first runs it (can undo, reset and pick for absent friends)
   const ownerRef=firebase.database().ref("leagues/"+LEAGUE+"/owner");
-  try{await ownerRef.transaction(cur=>cur||me);}catch(e){}
-  ownerRef.on("value",s=>{owner=s.val()===me;render();});
+  ownerRef.transaction(cur=>cur||me).catch(e=>showDbError(e));
+  ownerRef.on("value",s=>{owner=s.val()===me;stale=false;clearTimeout(loadTimer);render();},e=>showDbError(e));
   loadTimer=setTimeout(()=>{stale=true;render();},10000);
   subscribeAll();
+  firebase.database().ref(".info/connected").on("value",s=>{connected=!!s.val();render();});
 }
 
 async function startDraft(k,names,order,rounds,seatIdx){
@@ -634,7 +637,8 @@ function render(){
 }
 function modeBanner(){
   if(MODE==="local") return `<div class="banner">Playing on this device only. Live drafting from separate phones turns on once the Firebase settings are added.</div>`;
-  if(MODE==="shared"&&stale) return `<div class="banner warn">Can't reach the shared draft yet. What you see may be out of date.</div>`;
+  if(MODE==="shared"&&dbError) return `<div class="banner warn">The shared draft refused to load: <b>${esc(dbError)}</b>. ${/permission/i.test(dbError)?"Your Firebase database rules are blocking access. In Firebase, open Realtime Database → Rules and publish the rules from the setup guide.":"Check that the Realtime Database exists in your Firebase project."}</div>`;
+  if(MODE==="shared"&&stale) return `<div class="banner warn">Can't reach the shared draft yet${connected?"":" (no connection to Firebase)"}. Check that the Realtime Database was created in your Firebase project and that this phone is online.</div>`;
   return "";
 }
 function setupView(){
