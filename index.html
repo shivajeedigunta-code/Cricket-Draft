@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Friends Cricket Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+body{margin:0}html{-webkit-text-size-adjust:100%}
+/* Layout: a scoreboard header with format tabs, then a two-column draft desk (player pool | squads) that stacks on phones */
+:root{
+  --bg:#f3f6f1; --panel:#ffffff; --ink:#14261b; --muted:#5d6f62; --line:#d6e0d6;
+  --pitch:#1f5a37; --pitch-ink:#f2f7f0; --ball:#b3262d; --ball-soft:#f6e3e2; --gold:#a87a12;
+  --chip:#e7efe6; --focus:#2f7d4f;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1712; --panel:#16211a; --ink:#e4ede5; --muted:#93a597; --line:#273629;
+  --pitch:#1d4a30; --pitch-ink:#eaf3ec; --ball:#e2575c; --ball-soft:#3a1d1f; --gold:#e0b44a;
+  --chip:#203026; --focus:#6fcf97; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f1712; --panel:#16211a; --ink:#e4ede5; --muted:#93a597; --line:#273629;
+  --pitch:#1d4a30; --pitch-ink:#eaf3ec; --ball:#e2575c; --ball-soft:#3a1d1f; --gold:#e0b44a;
+  --chip:#203026; --focus:#6fcf97; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.board{background:var(--pitch);color:var(--pitch-ink)}
+header.board .wrap{padding-block:18px 0;display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font-family:var(--display);font-weight:700;font-size:2rem;letter-spacing:.02em;margin:0;text-transform:uppercase}
+.brand p{margin:0;opacity:.8;font-size:.9rem}
+.tabs{display:flex;gap:4px;overflow-x:auto}
+.tab{background:transparent;border:0;border-radius:8px 8px 0 0;padding:10px 16px;font-family:var(--display);font-size:1.1rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--pitch-ink);opacity:.75;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--bg);color:var(--ink);opacity:1}
+.tab .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:middle}
+main .wrap{padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+h2{font-family:var(--display);font-size:1.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin:0}
+h3{font-family:var(--display);font-size:1.1rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em;margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--pitch)}
+.btn.primary{background:var(--pitch);color:var(--pitch-ink);border-color:var(--pitch)}
+.btn.danger{color:var(--ball);border-color:var(--ball)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+/* setup */
+.setup{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+input[type=text],input[type=search],select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+.names{display:grid;gap:8px}
+.callout{background:var(--ball-soft);border-radius:8px;padding:10px 12px;font-size:.85rem}
+/* clock */
+.clock{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--ink);color:var(--bg);border-radius:10px;padding:14px 18px}
+.clock .who{font-family:var(--display);font-size:1.8rem;font-weight:700;text-transform:uppercase;line-height:1.1}
+.clock .meta{font-size:.85rem;opacity:.8}
+.clock .btn{background:transparent;color:var(--bg);border-color:color-mix(in srgb,var(--bg) 40%,transparent)}
+.order{display:flex;gap:6px;flex-wrap:wrap}
+.order span{font-size:.78rem;padding:3px 8px;border-radius:99px;border:1px solid color-mix(in srgb,var(--bg) 35%,transparent)}
+.order span.now{background:var(--gold);border-color:var(--gold);color:#1a1405;font-weight:700}
+/* desk */
+.desk{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.desk{grid-template-columns:1fr}}
+.filters{display:grid;grid-template-columns:1fr auto;gap:8px;margin-block:12px}
+@media (max-width:520px){.filters{grid-template-columns:1fr}}
+.pool{display:flex;flex-direction:column;max-height:70vh;overflow:auto;border-top:1px solid var(--line)}
+.p{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.p.taken{opacity:.42}
+.rating{font-family:var(--display);font-weight:700;font-size:1.45rem;text-align:center;border-radius:8px;background:var(--chip);padding:2px 0}
+.rating.elite{background:var(--pitch);color:var(--pitch-ink)}
+.pname{font-weight:600}
+.chips{display:inline-flex;gap:4px;margin-left:6px;vertical-align:1px}
+.chip{font-size:.68rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:4px;background:var(--chip);color:var(--muted)}
+.chip.BOWL{color:var(--ball)}.chip.AR{color:var(--gold)}.chip.WK{color:var(--pitch)}
+:root:not([data-theme="light"]) .chip.WK{color:var(--focus)}
+.stats{font-size:.8rem;color:var(--muted)}
+.pickedby{font-size:.78rem;font-weight:600;color:var(--muted)}
+.squads{display:grid;gap:12px}
+.sq{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel)}
+.sq.now{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.sq header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sq ol{margin:8px 0 0;padding-left:20px;display:grid;gap:2px}
+.sq li{font-size:.86rem}
+.sq li b{font-weight:600}
+.total{font-family:var(--display);font-weight:700;font-size:1.3rem}
+.mix{font-size:.75rem;color:var(--muted)}
+/* results */
+.results{display:grid;gap:8px}
+.res{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border-radius:8px;background:var(--chip)}
+.res .pos{font-family:var(--display);font-size:1.6rem;font-weight:700;text-align:center}
+.res:first-child{background:var(--pitch);color:var(--pitch-ink)}
+details summary{cursor:pointer;font-weight:600}
+.method{font-size:.85rem;max-width:70ch}
+.method code{font-size:.8rem}
+.log{font-size:.8rem;color:var(--muted);display:flex;flex-direction:column-reverse;gap:2px;max-height:160px;overflow:auto}
+@media (prefers-reduced-motion:no-preference){.p{transition:opacity .2s}}
+.banner{background:var(--chip);border-radius:8px;padding:10px 14px;font-size:.88rem}
+.banner.warn{background:var(--ball-soft)}
+.clock.mine{background:var(--pitch);color:var(--pitch-ink)}
+.clock.mine .btn{color:var(--pitch-ink)}
+.chip.you{background:var(--gold);color:#1a1405}
+.btn.tiny{padding:2px 8px;font-size:.75rem;vertical-align:2px}
+.link{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:.72rem;cursor:pointer;font-family:var(--body);text-transform:none;letter-spacing:0}
+.sq h3{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;max-width:calc(100% - 32px);z-index:20;font-size:.88rem}
+.invs{display:grid;gap:10px}
+.inv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:10px;align-items:center}
+@media (max-width:620px){.inv{grid-template-columns:1fr}}
+.inv input{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+a.btn{text-decoration:none;display:inline-block;color:var(--ink)}
+a.btn.off{opacity:.45;pointer-events:none}
+textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;color:inherit}
+details summary h3{cursor:pointer}
+.seg{display:flex;gap:4px;background:var(--chip);border-radius:9px;padding:3px;margin-top:12px;overflow-x:auto}
+.seg button{flex:1;border:0;background:transparent;border-radius:7px;padding:7px 10px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px color-mix(in srgb,var(--ink) 15%,transparent)}
+.grp{font-family:var(--display);font-weight:700;font-size:1.05rem;text-transform:uppercase;letter-spacing:.04em;padding:12px 4px 4px;position:sticky;top:0;background:var(--panel);z-index:1;border-bottom:1px solid var(--line)}
+.chip.rank{background:var(--ink);color:var(--bg)}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:10px}
+@media (max-width:860px){.cols{grid-template-columns:1fr}}
+h4{font-family:var(--display);font-size:1rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:0 0 4px;color:var(--muted)}
+.nrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center}
+@media (max-width:620px){.nrow{grid-template-columns:1fr 1fr}.nrow .row{grid-column:1/-1}.nrow{padding-bottom:8px;border-bottom:1px solid var(--line)}}
+.nrow input[type=tel]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+.btn.wa:not(.off){background:#1f8f4e;border-color:#1f8f4e;color:#fff}
+</style>
+
+</head><body>
+<header class="board">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Friends Cricket Draft</h1>
+      <p>Five friends, one snake draft, four formats.</p>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </div>
+</header>
+<main><div class="wrap" id="app"></div></main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* Paste the firebaseConfig from your Firebase project here. Leave it null to play on one device. */
+const FIREBASE_CONFIG = null;
+</script>
+<script>
+/* ---------------------------------------------------------------
+   Player stats: career figures typed in from memory (approx., to
+   around the 2025 season). GUESSES — check before you rely on them.
+   Fields: name, team, role, matches, runs, bat avg, strike rate,
+           wickets, bowl avg, economy
+---------------------------------------------------------------- */
+const RAW = {
+ipl:[
+["Virat Kohli","RCB","BAT",267,8661,39.5,132.9,4,0,0],
+["Rohit Sharma","MI","BAT",272,7046,29.7,132.1,15,30.2,8.0],
+["MS Dhoni","CSK","WK",278,5439,38.3,137.5,0,0,0],
+["Suryakumar Yadav","MI","BAT",166,4311,32.0,147.0,0,0,0],
+["KL Rahul","DC","WK",145,5222,46.0,136.0,0,0,0],
+["Shubman Gill","GT","BAT",118,3866,39.0,138.0,0,0,0],
+["Sanju Samson","RR","WK",177,4704,30.0,139.0,0,0,0],
+["Jos Buttler","GT","WK",121,4120,40.0,149.0,0,0,0],
+["Travis Head","SRH","BAT",38,1300,37.0,175.0,0,0,0],
+["Abhishek Sharma","SRH","BAT",77,1816,26.0,162.0,11,38,9.2],
+["Heinrich Klaasen","SRH","WK",49,1480,40.0,170.0,0,0,0],
+["Nicholas Pooran","LSG","WK",90,2700,34.0,168.0,0,0,0],
+["Yashasvi Jaiswal","RR","BAT",66,2166,34.0,151.0,0,0,0],
+["Sai Sudharsan","GT","BAT",40,1800,47.0,140.0,0,0,0],
+["Rishabh Pant","LSG","WK",125,3550,34.0,147.0,0,0,0],
+["Shreyas Iyer","PBKS","BAT",132,3731,34.0,133.0,0,0,0],
+["Hardik Pandya","MI","AR",152,2749,29.0,145.0,78,33.0,9.0],
+["Andre Russell","KKR","AR",140,2650,28.0,174.0,120,25.0,9.4],
+["Sunil Narine","KKR","AR",188,1780,17.0,165.0,190,25.8,6.8],
+["Ravindra Jadeja","CSK","AR",254,3260,28.0,130.0,170,30.0,7.7],
+["Axar Patel","DC","AR",160,1916,22.0,131.0,128,30.0,7.3],
+["Glenn Maxwell","PBKS","AR",141,2819,23.8,155.0,41,34.0,8.4],
+["Marcus Stoinis","PBKS","AR",96,1866,28.0,141.0,43,33.0,9.4],
+["Krunal Pandya","RCB","AR",140,1700,22.0,132.0,93,30.0,7.4],
+["Jasprit Bumrah","MI","BOWL",145,60,7,90,183,22.5,7.25],
+["Yuzvendra Chahal","PBKS","BOWL",174,40,5,80,221,22.4,7.9],
+["Rashid Khan","GT","BOWL",136,580,15,160,158,22.0,7.0],
+["Bhuvneshwar Kumar","RCB","BOWL",190,320,9,100,198,27.0,7.6],
+["Mohammed Shami","SRH","BOWL",120,80,6,90,133,28.0,8.5],
+["Trent Boult","MI","BOWL",120,100,8,100,140,26.5,8.3],
+["Pat Cummins","SRH","BOWL",70,560,20,150,79,30.0,8.9],
+["Kuldeep Yadav","DC","BOWL",98,150,11,100,102,26.0,8.0],
+["Varun Chakravarthy","KKR","BOWL",83,30,4,70,100,23.0,7.6],
+["Arshdeep Singh","PBKS","BOWL",81,30,5,80,97,26.0,8.9],
+["Harshal Patel","SRH","BOWL",119,300,11,125,151,24.0,8.8],
+["Mohammed Siraj","GT","BOWL",108,60,6,80,109,30.0,8.8],
+["Prasidh Krishna","GT","BOWL",66,20,3,60,74,28.0,8.8],
+["Ravichandran Ashwin","CSK","BOWL",221,833,13,118,187,30.0,7.2]
+],
+t20i:[
+["Virat Kohli","IND","BAT",125,4188,48.7,137.0,4,51,8.1],
+["Rohit Sharma","IND","BAT",159,4231,32.0,140.9,1,113,8.8],
+["Suryakumar Yadav","IND","BAT",90,2700,36.0,166.0,2,12,8.2],
+["Abhishek Sharma","IND","BAT",25,850,36.0,195.0,6,25,8.5],
+["Hardik Pandya","IND","AR",115,1800,27.0,141.0,95,26.0,8.2],
+["Axar Patel","IND","AR",70,600,20.0,140.0,75,22.0,7.3],
+["Jasprit Bumrah","IND","BOWL",75,10,3,60,95,17.6,6.4],
+["Arshdeep Singh","IND","BOWL",65,40,8,100,101,18.3,8.2],
+["Varun Chakravarthy","IND","BOWL",25,10,3,60,40,15.0,7.0],
+["Kuldeep Yadav","IND","BOWL",45,40,8,100,75,14.5,6.9],
+["Babar Azam","PAK","BAT",130,4300,39.5,129.0,0,0,0],
+["Mohammad Rizwan","PAK","WK",106,3400,47.0,125.0,0,0,0],
+["Shaheen Afridi","PAK","BOWL",80,200,12,130,100,21.0,7.7],
+["Jos Buttler","ENG","WK",135,3700,35.0,145.0,0,0,0],
+["Phil Salt","ENG","WK",40,1300,37.0,165.0,0,0,0],
+["Adil Rashid","ENG","BOWL",120,200,10,110,130,24.0,7.4],
+["Jofra Archer","ENG","BOWL",30,60,10,120,40,20.0,7.6],
+["Travis Head","AUS","BAT",35,1100,32.0,158.0,12,25,8.0],
+["Glenn Maxwell","AUS","AR",120,2750,29.0,155.0,49,29.0,7.9],
+["Mitchell Marsh","AUS","AR",70,2000,33.0,135.0,20,26.0,8.4],
+["Tim David","AUS","BAT",55,1200,32.0,165.0,0,0,0],
+["Adam Zampa","AUS","BOWL",100,100,8,100,125,20.0,6.9],
+["Josh Hazlewood","AUS","BOWL",55,30,6,80,75,21.0,7.3],
+["Rashid Khan","AFG","BOWL",100,500,12,130,160,14.8,6.1],
+["Mohammad Nabi","AFG","AR",130,2300,23.0,137.0,95,26.0,7.3],
+["Shakib Al Hasan","BAN","AR",129,2550,23.0,122.0,149,20.9,6.8],
+["Marcus Stoinis","AUS","AR",75,1250,26.0,145.0,45,25.0,8.6],
+["Wanindu Hasaranga","SL","AR",75,600,14.0,120.0,130,15.5,6.9],
+["Pathum Nissanka","SL","BAT",70,2000,31.0,125.0,0,0,0],
+["Quinton de Kock","SA","WK",92,2600,31.0,138.0,0,0,0],
+["Heinrich Klaasen","SA","WK",58,1000,23.0,142.0,0,0,0],
+["Kagiso Rabada","SA","BOWL",65,100,10,120,70,25.0,8.4],
+["Tabraiz Shamsi","SA","BOWL",70,30,5,80,85,21.0,7.0],
+["Anrich Nortje","SA","BOWL",45,20,4,70,55,19.0,7.2],
+["Mitchell Santner","NZ","AR",110,700,20.0,125.0,125,21.0,7.1],
+["Tim Southee","NZ","BOWL",126,300,9,120,164,23.0,8.1],
+["Devon Conway","NZ","WK",50,1400,35.0,128.0,0,0,0],
+["Finn Allen","NZ","BAT",45,1150,26.0,162.0,0,0,0],
+["Nicholas Pooran","WI","WK",106,2275,26.0,136.0,0,0,0],
+["Akeal Hosein","WI","BOWL",60,150,10,110,60,25.0,6.9]
+],
+odi:[
+["Virat Kohli","IND","BAT",305,14255,57.9,93.4,5,166,6.2],
+["Rohit Sharma","IND","BAT",279,11370,49.2,92.8,9,72,5.2],
+["Shubman Gill","IND","BAT",58,2800,56.0,99.0,0,0,0],
+["Shreyas Iyer","IND","BAT",73,2900,48.0,101.0,0,0,0],
+["KL Rahul","IND","WK",88,3100,49.0,88.0,0,0,0],
+["Hardik Pandya","IND","AR",94,1900,33.0,111.0,91,35.0,5.6],
+["Ravindra Jadeja","IND","AR",205,2800,32.0,85.0,230,36.0,4.9],
+["Jasprit Bumrah","IND","BOWL",89,90,8,60,149,23.5,4.6],
+["Mohammed Shami","IND","BOWL",108,250,10,80,206,24.0,5.6],
+["Kuldeep Yadav","IND","BOWL",113,200,10,70,181,26.0,5.0],
+["Babar Azam","PAK","BAT",130,6300,54.0,88.0,0,0,0],
+["Fakhar Zaman","PAK","BAT",86,3600,46.0,93.0,0,0,0],
+["Shaheen Afridi","PAK","BOWL",65,300,12,90,125,24.0,5.6],
+["Joe Root","ENG","BAT",185,7300,49.0,87.0,28,46,5.6],
+["Jos Buttler","ENG","WK",190,5400,39.0,115.0,0,0,0],
+["Ben Stokes","ENG","AR",114,3463,39.0,95.0,74,42.0,6.0],
+["Adil Rashid","ENG","BOWL",150,800,18,95,210,33.0,5.6],
+["Travis Head","AUS","BAT",75,2900,43.0,103.0,28,45,5.8],
+["Steve Smith","AUS","BAT",170,5800,43.0,87.0,28,35,5.4],
+["Glenn Maxwell","AUS","AR",149,3990,33.5,126.0,77,47.0,5.6],
+["Mitchell Starc","AUS","BOWL",130,600,13,85,244,23.5,5.2],
+["Adam Zampa","AUS","BOWL",110,300,10,80,190,28.0,5.5],
+["Pat Cummins","AUS","BOWL",90,500,15,90,141,29.0,5.3],
+["Quinton de Kock","SA","WK",155,6800,45.0,96.0,0,0,0],
+["Heinrich Klaasen","SA","WK",60,2140,44.0,117.0,0,0,0],
+["Kagiso Rabada","SA","BOWL",105,600,13,85,165,27.5,5.1],
+["Keshav Maharaj","SA","BOWL",50,350,15,80,70,28.0,4.8],
+["Kane Williamson","NZ","BAT",170,7200,49.0,81.0,37,40,5.4],
+["Daryl Mitchell","NZ","BAT",50,2000,52.0,93.0,12,50,6.2],
+["Rachin Ravindra","NZ","AR",30,1100,42.0,104.0,25,50.0,5.2],
+["Matt Henry","NZ","BOWL",90,500,13,85,160,25.0,5.2],
+["Mitchell Santner","NZ","AR",110,1700,27.0,93.0,115,37.0,4.8],
+["Rashid Khan","AFG","BOWL",110,1300,19,105,200,20.0,4.2],
+["Ibrahim Zadran","AFG","BAT",40,1900,50.0,87.0,0,0,0],
+["Shai Hope","WI","WK",140,5600,49.0,77.0,0,0,0],
+["Kusal Mendis","SL","WK",140,4500,36.0,87.0,0,0,0],
+["Wanindu Hasaranga","SL","AR",65,830,18.0,92.0,100,28.0,5.1],
+["Shakib Al Hasan","BAN","AR",247,7570,37.0,82.0,317,29.0,4.4],
+["Mohammad Nabi","AFG","AR",165,3600,27.0,87.0,170,32.0,4.3]
+],
+test:[
+["Joe Root","ENG","BAT",158,13500,51.0,57.0,76,46,3.0],
+["Steve Smith","AUS","BAT",119,10500,56.0,54.0,19,58,3.6],
+["Kane Williamson","NZ","BAT",105,9276,54.9,51.0,30,40,3.4],
+["Virat Kohli","IND","BAT",123,9230,46.9,55.6,0,0,0],
+["Yashasvi Jaiswal","IND","BAT",24,2200,51.0,65.0,0,0,0],
+["Shubman Gill","IND","BAT",38,2600,41.0,61.0,0,0,0],
+["Harry Brook","ENG","BAT",28,2500,57.0,87.0,0,0,0],
+["Rishabh Pant","IND","WK",47,3400,44.0,74.0,0,0,0],
+["Travis Head","AUS","BAT",60,3900,42.0,68.0,17,40,4.0],
+["Usman Khawaja","AUS","BAT",85,6200,43.0,47.0,0,0,0],
+["Marnus Labuschagne","AUS","BAT",60,4800,46.0,52.0,15,50,3.8],
+["Kamindu Mendis","SL","BAT",14,1300,58.0,64.0,0,0,0],
+["Babar Azam","PAK","BAT",58,4200,43.0,54.0,0,0,0],
+["Temba Bavuma","SA","BAT",65,3700,38.0,50.0,0,0,0],
+["Aiden Markram","SA","BAT",50,3500,37.0,60.0,0,0,0],
+["Tom Latham","NZ","BAT",85,5800,38.0,48.0,0,0,0],
+["Rachin Ravindra","NZ","BAT",12,900,40.0,62.0,10,50,3.8],
+["Alex Carey","AUS","WK",40,2000,34.0,60.0,0,0,0],
+["Ben Stokes","ENG","AR",115,6900,35.0,59.0,230,32.0,3.3],
+["Ravindra Jadeja","IND","AR",85,3500,36.0,57.0,330,24.5,2.5],
+["Ravichandran Ashwin","IND","AR",106,3503,25.8,55.0,537,24.0,2.8],
+["Marco Jansen","SA","AR",25,800,22.0,60.0,100,22.0,3.3],
+["Shakib Al Hasan","BAN","AR",71,4600,38.0,59.0,246,31.0,2.9],
+["Chris Woakes","ENG","AR",62,2000,25.0,52.0,190,29.0,3.1],
+["Cameron Green","AUS","AR",30,1500,34.0,52.0,35,33.0,3.3],
+["Mitchell Marsh","AUS","AR",46,2000,28.5,62.0,50,33.0,3.4],
+["Jasprit Bumrah","IND","BOWL",48,300,8,45,217,19.5,2.75],
+["Mohammed Siraj","IND","BOWL",41,250,7,45,123,30.0,3.5],
+["Pat Cummins","AUS","BOWL",70,1600,17,50,300,22.0,2.8],
+["Mitchell Starc","AUS","BOWL",100,2300,21,64,410,27.0,3.4],
+["Josh Hazlewood","AUS","BOWL",75,600,11,40,290,25.0,2.8],
+["Nathan Lyon","AUS","BOWL",139,1600,12,45,560,30.5,2.9],
+["Kagiso Rabada","SA","BOWL",70,1100,14,48,330,22.0,3.4],
+["Keshav Maharaj","SA","BOWL",57,1300,17,55,200,31.0,2.9],
+["Matt Henry","NZ","BOWL",30,700,16,70,125,27.0,3.4],
+["Prabath Jayasuriya","SL","BOWL",20,300,10,45,110,28.0,3.1],
+["Noman Ali","PAK","BOWL",20,350,13,45,90,25.0,2.6],
+["Gus Atkinson","ENG","BOWL",12,450,25,80,55,22.0,3.8],
+["Shoaib Bashir","ENG","BOWL",19,200,8,45,68,39.0,3.7]
+]};
+
+/* Format baselines: what an "average good" international/IPL player looks like.
+   srW/econW = how much scoring rate / economy matter in that format. */
+const FORMATS = {
+  ipl: {label:"IPL", b:{bAvg:25,sr:135,srW:1.3,runsFull:2500,wAvg:27,econ:8.4,econW:1.0,wpm:1.0,wkFull:100}},
+  t20i:{label:"T20 International", b:{bAvg:25,sr:130,srW:1.3,runsFull:1500,wAvg:22,econ:7.6,econW:1.0,wpm:1.1,wkFull:70}},
+  odi: {label:"ODI", b:{bAvg:35,sr:88,srW:1.0,runsFull:3000,wAvg:32,econ:5.4,econW:0.6,wpm:1.4,wkFull:120}},
+  test:{label:"Test", b:{bAvg:35,sr:55,srW:0.3,runsFull:4000,wAvg:30,econ:3.2,econW:0.2,wpm:3.2,wkFull:200}}
+};
+const KEYS = Object.keys(FORMATS);
+const TEAMS = 5;
+
+function impact(p,b){
+  let bat=0,bowl=0;
+  if(p.runs>=150 && p.avg>0) bat=(p.avg/b.bAvg)*Math.pow(p.sr/b.sr,b.srW)*Math.pow(Math.min(1,p.runs/b.runsFull),0.35);
+  if(p.wk>=10 && p.wavg>0) bowl=(b.wAvg/p.wavg)*Math.pow(b.econ/p.econ,b.econW)*Math.pow((p.wk/p.m)/b.wpm,0.5)*Math.pow(Math.min(1,p.wk/b.wkFull),0.35);
+  return {bat,bowl,raw:Math.max(bat,bowl)+0.5*Math.min(bat,bowl)};
+}
+const POOLS = {};
+for(const k of KEYS){
+  const list = RAW[k].map((r,i)=>({id:k+i,name:r[0],team:r[1],role:r[2],m:r[3],runs:r[4],avg:r[5],sr:r[6],wk:r[7],wavg:r[8],econ:r[9]}));
+  list.forEach(p=>Object.assign(p,impact(p,FORMATS[k].b)));
+  const max=Math.max(...list.map(p=>p.raw));
+  list.forEach(p=>{p.rating=Math.round(100*p.raw/max);p.batR=Math.round(100*p.bat/max);p.bowlR=Math.round(100*p.bowl/max)});
+  // separate rankings: batters (incl. keepers) by batting, bowlers by bowling, all-rounders by both skills together
+  list.forEach(p=>{p.cat=p.role==="BOWL"?"BOWL":p.role==="AR"?"AR":"BAT";p.catScore=p.cat==="BAT"?p.bat:p.cat==="BOWL"?p.bowl:p.bat+p.bowl;});
+  for(const c of ["BAT","BOWL","AR"]){const g=list.filter(p=>p.cat===c).sort((a,b)=>b.catScore-a.catScore);const top=g[0]?g[0].catScore:1;
+    g.forEach((p,i)=>{p.catRank=i+1;p.catRating=Math.round(100*p.catScore/top);});}
+  list.sort((a,b)=>b.rating-a.rating);
+  POOLS[k]=list;
+}
+const byId = id => { for(const k of KEYS){const p=POOLS[k].find(x=>x.id===id); if(p) return p;} };
+
+/* ---------- state ----------
+   Shared mode: the draft lives in the artifact's shared database, so each
+   friend can pick from their own phone.
+     drafts/{format}              -> {active, gameId, names, order, rounds, seats}
+     games/{gameId}/picks/{nnn}   -> {i, pid, team, by}
+   Local mode (signed out / storage unavailable): same shape, kept in this browser. */
+const UISTORE="friends-cricket-draft-ui-v2", LOCALSTORE="friends-cricket-draft-local-v2";
+let UI={active:"ipl",q:"",cat:"ALL",sort:"rank",hideTaken:true};
+try{Object.assign(UI,JSON.parse(localStorage.getItem(UISTORE))||{})}catch(e){}
+function saveUI(){try{localStorage.setItem(UISTORE,JSON.stringify(UI))}catch(e){}}
+const PHONESTORE="friends-cricket-draft-phones-v1";
+let PHONES={};
+try{PHONES=JSON.parse(localStorage.getItem(PHONESTORE))||{}}catch(e){}
+function savePhones(){try{localStorage.setItem(PHONESTORE,JSON.stringify(PHONES))}catch(e){}}
+let LEAGUE=(location.hash.match(/^#([a-z0-9]{6,24})$/)||[])[1];
+if(!LEAGUE){try{LEAGUE=localStorage.getItem("friends-cricket-draft-league")}catch(e){}
+  if(!LEAGUE||!/^[a-z0-9]{6,24}$/.test(LEAGUE))LEAGUE=Math.random().toString(36).slice(2,10);
+  try{history.replaceState(null,"","#"+LEAGUE)}catch(e){location.hash=LEAGUE}}
+try{localStorage.setItem("friends-cricket-draft-league",LEAGUE)}catch(e){}
+window.addEventListener("hashchange",()=>{const m=location.hash.match(/^#([a-z0-9]{6,24})$/);if(m&&m[1]!==LEAGUE)location.reload();});
+const PAGE_URL=location.origin+location.pathname+"#"+LEAGUE;
+function deviceId(){let id=null;try{id=localStorage.getItem("friends-cricket-draft-device")}catch(e){}
+  if(!id){id="d"+Math.random().toString(36).slice(2,12)+Date.now().toString(36);try{localStorage.setItem("friends-cricket-draft-device",id)}catch(e){}}return id;}
+/* Small adapter so the draft code talks to Firebase Realtime Database */
+function firebaseDb(rdb){
+  const root=p=>rdb.ref("leagues/"+LEAGUE+"/"+p);
+  const wrap=s=>({id:s.key,exists:s.exists(),data:()=>s.val(),metadata:{fromCache:false,hasPendingWrites:false}});
+  const flat=(o,pre,out)=>{for(const k in o){const v=o[k];if(v&&typeof v==="object"&&!Array.isArray(v))flat(v,pre+k+"/",out);else out[pre+k]=v;}return out;};
+  return {
+    doc:p=>({onSnapshot:(n,e)=>{const r=root(p),f=s=>n(wrap(s));r.on("value",f,e);return()=>r.off("value",f);},
+      get:async()=>wrap(await root(p).get()),set:d=>root(p).set(d),update:d=>root(p).update(flat(d,"",{})),delete:()=>root(p).remove(),
+      create:async d=>(await root(p).transaction(cur=>cur===null?d:undefined)).committed}),
+    collection:p=>({onSnapshot:(n,e)=>{const r=root(p),f=s=>{const docs=[];s.forEach(c=>{docs.push(wrap(c))});n({docs,size:docs.length,empty:!docs.length,metadata:{fromCache:false}});};r.on("value",f,e);return()=>r.off("value",f);}})
+  };
+}
+let copyFallback="";
+let LOCAL={};
+try{LOCAL=JSON.parse(localStorage.getItem(LOCALSTORE))||{}}catch(e){}
+function saveLocal(){try{localStorage.setItem(LOCALSTORE,JSON.stringify(LOCAL))}catch(e){}}
+
+let MODE="loading", db=null, me=null, owner=false, editor=false, stale=false;
+const DR={}, PK={}, SUBS={};
+let confirmNew=false, busy=false, toastMsg="", toastTimer=null;
+let lastNames=["Friend 1","Friend 2","Friend 3","Friend 4","Friend 5"];
+
+function toast(m){toastMsg=m;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toastMsg="";render()},4000);render();}
+function getDraft(k){
+  if(MODE==="local"){return LOCAL[k]&&LOCAL[k].active?LOCAL[k]:null;}
+  const d=DR[k]; if(!d||!d.active||!Array.isArray(d.names)||!Array.isArray(d.order)) return null;
+  return {...d,picks:PK[k]&&PK[k].gid===d.gameId?PK[k].list:[]};
+}
+function teamForPick(d,i){const r=Math.floor(i/TEAMS),pos=i%TEAMS;return d.order[r%2===0?pos:TEAMS-1-pos];}
+function done(d){return d.picks.length>=d.rounds*TEAMS;}
+function squad(d,t){return d.picks.filter(x=>x.team===t).map(x=>byId(x.pid)).filter(Boolean);}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function seatOf(d,t){return MODE==="shared"&&d.seats?d.seats[t]||null:null;}
+function mySeat(d){if(MODE!=="shared"||!me||!d.seats)return null;for(const t in d.seats){if(d.seats[t]===me)return +t;}return null;}
+function canPickFor(d,t){if(MODE==="local")return true;const s=seatOf(d,t);return !s||s===me||owner;}
+function canManage(){return MODE==="local"||owner||editor;}
+
+/* ---------- shared storage ---------- */
+function subscribeAll(){
+  for(const k of KEYS){
+    db.doc("drafts/"+k).onSnapshot(snap=>{
+      if(!snap.metadata.fromCache){stale=false;clearTimeout(loadTimer);}
+      DR[k]=snap.exists?snap.data():null;
+      const gid=DR[k]&&DR[k].active?DR[k].gameId:null;
+      if(!SUBS[k]||SUBS[k].gid!==gid){
+        if(SUBS[k])SUBS[k].unsub();
+        SUBS[k]={gid,unsub:()=>{}};
+        if(gid&&/^[a-z0-9]+$/.test(gid)){
+          SUBS[k].unsub=db.collection("games/"+gid+"/picks").onSnapshot(qs=>{
+            const list=qs.docs.map(x=>x.data()).filter(p=>p&&byId(p.pid)&&Number.isInteger(p.i)).sort((a,b)=>a.i-b.i);
+            const seen=new Set(),clean=[];
+            for(const p of list){if(p.i!==clean.length||seen.has(p.pid))break;seen.add(p.pid);clean.push(p);}
+            PK[k]={gid,list:clean};render();
+          },e=>{toast("Lost the live connection to the picks. Reload the page to reconnect.");});
+        }
+      }
+      render();
+    },e=>{toast("Couldn't load the shared draft ("+(e&&e.code||"error")+").");});
+  }
+}
+let loadTimer=null;
+async function boot(){
+  render();
+  try{ if(FIREBASE_CONFIG&&window.firebase){firebase.initializeApp(FIREBASE_CONFIG);db=firebaseDb(firebase.database());} }catch(e){db=null;}
+  if(!db){MODE="local";render();return;}
+  me=deviceId();
+  MODE="shared";
+  // whoever opens a new league link first runs it (can undo, reset and pick for absent friends)
+  const ownerRef=firebase.database().ref("leagues/"+LEAGUE+"/owner");
+  try{await ownerRef.transaction(cur=>cur||me);}catch(e){}
+  ownerRef.on("value",s=>{owner=s.val()===me;render();});
+  loadTimer=setTimeout(()=>{stale=true;render();},10000);
+  subscribeAll();
+}
+
+async function startDraft(k,names,order,rounds,seatIdx){
+  const gameId=Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  const seats={}; if(MODE==="shared"&&me&&seatIdx>=0) seats[seatIdx]=me;
+  const d={active:true,gameId,names,order,rounds,seats,started:Date.now()};
+  if(MODE==="local"){LOCAL[k]={...d,picks:[]};saveLocal();render();return;}
+  await db.doc("drafts/"+k).set(d);
+}
+async function makePick(k,pid){
+  const d=getDraft(k); if(!d||done(d))return;
+  const i=d.picks.length,team=teamForPick(d,i);
+  if(d.picks.some(x=>x.pid===pid)){toast("That player is already taken.");return;}
+  if(!canPickFor(d,team)){toast("It's "+d.names[team]+"'s pick. Wait for your turn.");return;}
+  const p={i,pid,team,by:me||"local"};
+  if(MODE==="local"){d.picks.push(p);saveLocal();render();return;}
+  const ref=db.doc("games/"+d.gameId+"/picks/p"+String(i).padStart(3,"0"));
+  if(!(await ref.create(p))) toast("That pick was just made by someone else.");
+}
+async function undo(k){
+  const d=getDraft(k); if(!d||!d.picks.length)return;
+  const last=d.picks[d.picks.length-1];
+  if(MODE==="local"){d.picks.pop();saveLocal();render();return;}
+  if(!(owner||editor||last.by===me)){toast("Only the person who made the last pick, or the draft owner, can undo it.");return;}
+  await db.doc("games/"+d.gameId+"/picks/p"+String(last.i).padStart(3,"0")).delete();
+}
+async function claimSeat(k,t){
+  const d=getDraft(k); if(!d||MODE!=="shared")return;
+  if(seatOf(d,t)){toast("Someone already claimed that seat.");return;}
+  if(mySeat(d)!==null){toast("You already have a seat in this draft.");return;}
+  await db.doc("drafts/"+k).update({seats:{[t]:me}});
+}
+async function freeSeat(k,t){
+  const d=getDraft(k); if(!d||MODE!=="shared")return;
+  await db.doc("drafts/"+k).update({seats:{[t]:""}});
+}
+async function resetDraft(k){
+  if(MODE==="local"){delete LOCAL[k];saveLocal();render();return;}
+  await db.doc("drafts/"+k).set({active:false});
+}
+async function run(fn){if(busy)return;busy=true;render();try{await fn();}catch(e){toast(e&&e.code==="permission_denied"?"You don't have permission to change this draft. Ask the friend who started it to check the Firebase settings.":"That didn't save ("+(e&&e.code||"error")+"). Try again.");}finally{busy=false;render();}}
+
+/* ---------- render ---------- */
+const app=document.getElementById("app"), tabs=document.getElementById("tabs");
+function render(){
+  tabs.innerHTML=KEYS.map(k=>{const d=getDraft(k);const live=d&&!done(d);
+    return `<button class="tab" role="tab" aria-selected="${k===UI.active}" data-tab="${k}">${FORMATS[k].label}${live?'<span class="dot" title="Draft in progress"></span>':''}</button>`}).join("");
+  const d=getDraft(UI.active);
+  let body = MODE==="loading" ? `<div class="banner">Connecting to the shared draft…</div>` : (d ? draftView(d) : setupView());
+  const ae=document.activeElement, fid=ae&&ae.id&&app.contains(ae)?ae.id:null;
+  let sel=null; try{sel=fid?[ae.selectionStart,ae.selectionEnd]:null}catch(e){}
+  app.innerHTML = modeBanner() + body + (toastMsg?`<div class="toast" role="status">${esc(toastMsg)}</div>`:"");
+  if(fid){const el=document.getElementById(fid); if(el){el.focus(); try{if(sel&&sel[0]!=null)el.setSelectionRange(sel[0],sel[1]);}catch(e){}}}
+  // tab title tells you when it's your turn
+  let mine=false; if(d&&!done(d)&&MODE==="shared"){const t=teamForPick(d,d.picks.length);mine=seatOf(d,t)===me&&!!me;}
+  document.title=(mine?"Your pick! · ":"")+"Friends Cricket Draft";
+}
+function modeBanner(){
+  if(MODE==="local") return `<div class="banner">Playing on this device only. Live drafting from separate phones turns on once the Firebase settings are added.</div>`;
+  if(MODE==="shared"&&stale) return `<div class="banner warn">Can't reach the shared draft yet. What you see may be out of date.</div>`;
+  return "";
+}
+function setupView(){
+  const k=UI.active,f=FORMATS[k],pool=POOLS[k],maxR=Math.floor(pool.length/TEAMS);
+  const shared=MODE==="shared";
+  return `<section class="panel setup">
+    <div class="field" style="gap:10px">
+      <h2>New ${f.label} draft</h2>
+      <p class="muted" style="margin:0">${shared?"Set up the draft, then send this page to your friends. Each friend opens it on their phone, claims their seat and makes their own picks when they're on the clock.":"Five friends take turns picking players. Pass the phone around as each friend comes on the clock."} The order snakes: 1→5, then 5→1, and so on.</p>
+      <div class="field"><label for="rounds">Players per squad</label>
+        <select id="rounds">${Array.from({length:maxR-2},(_,i)=>i+3).map(n=>`<option ${n===Math.min(6,maxR)?"selected":""}>${n}</option>`).join("")}</select></div>
+      <label class="row small"><input type="checkbox" id="shuffle" checked> Shuffle the pick order</label>
+      <div class="callout">${pool.length} ${f.label} players in the pool, ranked by an impact rating built from career stats.</div>
+    </div>
+    <div class="field" style="gap:10px">
+      <h3>The five friends</h3>
+      <p class="muted small" style="margin:0">Add each friend's WhatsApp number with the country code (for example +91 98765 43210 or +1 312 555 0101), then tap WhatsApp to send them the link. Numbers stay on this device only.</p>
+      <div class="names">${lastNames.map((n,i)=>{const ph=PHONES[phoneKey(n)]||"";return `<div class="nrow">
+        <input type="text" id="name${i}" aria-label="Friend ${i+1} name" value="${esc(n)}" maxlength="24">
+        <input type="tel" id="sphone${i}" inputmode="tel" autocomplete="off" placeholder="WhatsApp no. with country code" aria-label="Friend ${i+1} WhatsApp number" value="${esc(ph)}">
+        <span class="row" style="gap:6px;flex-wrap:nowrap"><a class="btn wa ${cleanPhone(ph)?"":"off"}" id="ssms${i}" href="${esc(smsFor(n,ph))}" target="_blank" rel="noopener">WhatsApp</a><button class="btn" data-copyname="${i}">Copy</button></span></div>`}).join("")}</div>
+      ${copyFallback?`<div class="field"><label for="copybox">Copy this message</label><textarea id="copybox" readonly rows="3">${esc(copyFallback)}</textarea></div>`:""}
+      ${shared?`<div class="field"><label for="me">Which one is you?</label><select id="me"><option value="-1">I'm not playing</option>${lastNames.map((n,i)=>`<option value="${i}" ${i===0?"selected":""}>${esc(n)}</option>`).join("")}</select></div>`:""}
+      <div class="row"><button class="btn primary" data-act="start" ${busy?"disabled":""}>Start draft</button></div>
+    </div>
+  </section>
+  ${poolPreview(k)}${methodView(k)}`;
+}
+const CATNAME={BAT:"batters",BOWL:"bowlers",AR:"all-rounders"},CATSHORT={BAT:"bat",BOWL:"bowl",AR:"AR"};
+const CATS=[["BAT","Batters"],["BOWL","Bowlers"],["AR","All-rounders"]];
+function poolPreview(k){
+  return `<section class="panel"><h3>${FORMATS[k].label} rankings</h3>
+  <div class="cols">${CATS.map(([c,l])=>`<div style="min-width:0"><h4>${l}</h4><div class="pool" style="max-height:none">${POOLS[k].filter(p=>p.cat===c).sort((a,b)=>a.catRank-b.catRank).slice(0,5).map(p=>playerRow(p,null,false)).join("")}</div></div>`).join("")}</div></section>`;
+}
+function statLine(p){
+  const out=[`${p.m} m`];
+  if(p.runs>=150) out.push(`${p.runs.toLocaleString()} runs @ ${p.avg.toFixed(1)}, SR ${p.sr.toFixed(0)}`);
+  if(p.wk>=10) out.push(`${p.wk} wkts @ ${p.wavg.toFixed(1)}, econ ${p.econ.toFixed(2)}`);
+  return out.join(" · ");
+}
+function playerRow(p,d,canPick){
+  const pick=d&&d.picks.find(x=>x.pid===p.id);
+  const right = pick ? `<span class="pickedby">${esc(d.names[pick.team])}</span>` :
+    (canPick?`<button class="btn" data-pick="${p.id}" ${busy?"disabled":""} aria-label="Pick ${esc(p.name)}">Pick</button>`:"");
+  return `<div class="p ${pick?"taken":""}">
+    <div class="rating ${p.rating>=85?"elite":""}" title="Impact rating (bat ${p.batR}, bowl ${p.bowlR})">${p.rating}</div>
+    <div style="min-width:0"><span class="pname">${esc(p.name)}</span><span class="chips"><span class="chip rank" title="Rank among ${CATNAME[p.cat]}">#${p.catRank} ${CATSHORT[p.cat]}</span><span class="chip">${p.team}</span><span class="chip ${p.role}">${p.role}</span></span>
+      <div class="stats">${statLine(p)}</div></div>
+    <div>${right}</div></div>`;
+}
+function draftView(d){
+  const k=UI.active,f=FORMATS[k],total=d.rounds*TEAMS,i=d.picks.length,fin=done(d);
+  const cur=fin?null:teamForPick(d,i), u=UI, mine=mySeat(d);
+  const allowed=!fin&&canPickFor(d,cur);
+  const yourTurn=!fin&&MODE==="shared"&&mine===cur;
+  if(!["ALL","BAT","BOWL","AR"].includes(u.cat))u.cat="ALL";
+  let list=POOLS[k].filter(p=>(u.cat==="ALL"||p.cat===u.cat)&&(!u.q||p.name.toLowerCase().includes(u.q.toLowerCase())||p.team.toLowerCase()===u.q.toLowerCase()));
+  if(u.hideTaken) list=list.filter(p=>!d.picks.some(x=>x.pid===p.id));
+  const sorters={rank:(a,b)=>a.catRank-b.catRank||b.rating-a.rating,rating:(a,b)=>b.rating-a.rating,bat:(a,b)=>b.batR-a.batR,bowl:(a,b)=>b.bowlR-a.bowlR,name:(a,b)=>a.name.localeCompare(b.name)};
+  list.sort(sorters[u.sort]||sorters.rating);
+  const rnd=Math.floor(i/TEAMS);
+  const upcoming=fin?"":Array.from({length:TEAMS},(_,j)=>d.order[rnd%2===0?j:TEAMS-1-j]).map(t=>`<span class="${t===cur?"now":""}">${esc(d.names[t])}${t===mine?" (you)":""}</span>`).join("");
+  const last=d.picks[d.picks.length-1];
+  const canUndo=last&&(MODE==="local"||owner||editor||last.by===me);
+  const who = yourTurn ? "Your pick, "+esc(d.names[cur]) : esc(d.names[cur])+" is on the clock";
+  let sub="";
+  if(!fin&&MODE==="shared"){
+    if(yourTurn) sub="Pick a player from the pool below.";
+    else if(!seatOf(d,cur)) sub="This seat isn't claimed yet, so anyone can pick for them.";
+    else if(owner) sub="You own this draft, so you can pick for them if they're away.";
+    else sub="Waiting for them to pick. This page updates live.";
+  }
+  const clock = fin
+    ? `<div class="clock"><div><div class="meta">${f.label} draft complete</div><div class="who">Final standings</div></div>
+        <div class="row">${canUndo?`<button class="btn" data-act="undo">Undo last pick</button>`:""}${canManage()?`<button class="btn" data-act="new">New ${f.label} draft</button>`:""}</div></div>`
+    : `<div class="clock ${yourTurn?"mine":""}"><div><div class="meta">Round ${rnd+1} of ${d.rounds} · pick ${i+1} of ${total}</div>
+        <div class="who">${who}</div>${sub?`<div class="meta" style="margin-top:2px">${sub}</div>`:""}<div class="order" style="margin-top:6px">${upcoming}</div></div>
+        <div class="row">${canUndo?`<button class="btn" data-act="undo" ${busy?"disabled":""}>Undo last pick</button>`:""}${canManage()?`<button class="btn" data-act="new">New draft</button>`:""}</div></div>`;
+  const conf = confirmNew ? `<div class="panel callout row" style="justify-content:space-between"><span>Start over? This clears the ${f.label} draft and all ${d.picks.length} picks${MODE==="shared"?" for everyone":""}.</span>
+     <span class="row"><button class="btn danger" data-act="reset">Clear and start over</button><button class="btn" data-act="cancel">Keep this draft</button></span></div>` : "";
+  const join = (MODE==="shared"&&mine===null&&!fin&&d.order.some(t=>!seatOf(d,t))) ? `<div class="banner">Playing in this draft? Tap <b>This is me</b> on your squad below so only you can make your picks.</div>`:"";
+  return `${clock}${conf}${join}${inviteView(d,mine)}${fin?resultsView(d):""}
+  <div class="desk">
+    <section class="panel" style="min-width:0">
+      <div class="row" style="justify-content:space-between"><h2>Player pool</h2><span class="muted small">${list.length} shown</span></div>
+      <div class="seg" role="tablist" aria-label="Player type">${[["ALL","All"],...CATS].map(([c,l])=>`<button role="tab" aria-selected="${u.cat===c}" data-cat="${c}">${l}</button>`).join("")}</div>
+      <div class="filters">
+        <input type="search" id="q" placeholder="Search name or team (e.g. CSK, IND)" value="${esc(u.q)}" aria-label="Search players">
+        <select id="sort" aria-label="Sort">${[["rank","Ranking"],["rating","Impact"],["bat","Batting"],["bowl","Bowling"],["name","Name"]].map(([v,l])=>`<option value="${v}" ${u.sort===v?"selected":""}>Sort: ${l}</option>`).join("")}</select>
+      </div>
+      <label class="row small muted" style="margin-bottom:8px"><input type="checkbox" id="hideTaken" ${u.hideTaken?"checked":""}> Hide players already picked</label>
+      <div class="pool">${poolGroups(list,d,allowed,u)}</div>
+    </section>
+    <section style="min-width:0;display:flex;flex-direction:column;gap:12px">
+      <h2>Squads</h2>
+      <div class="squads">${d.order.map(t=>squadView(d,t,t===cur,mine)).join("")}</div>
+      <div class="panel"><h3>Pick log</h3><div class="log" style="margin-top:6px">${d.picks.map((x,j)=>`<div>${j+1}. ${esc(d.names[x.team])} took ${esc(byId(x.pid).name)}</div>`).join("")||"<div>No picks yet.</div>"}</div></div>
+    </section>
+  </div>${methodView(k)}`;
+}
+function phoneKey(n){return String(n).trim().toLowerCase();}
+function cleanPhone(p){return String(p||"").replace(/\D/g,"").length>=8?"1":"";}
+function msgFor(n){return `Hi ${n}! Join our ${FORMATS[UI.active].label} cricket draft: ${PAGE_URL} . No login needed. Open the link and tap "This is me" on ${n}'s squad once the draft starts. You pick when you're on the clock.`;}
+function waDigits(ph){return String(ph||"").replace(/\D/g,"");}
+function smsFor(n,ph){return `https://wa.me/${waDigits(ph)}?text=${encodeURIComponent(msgFor(n))}`;}
+function inviteText(d,t){return `Hi ${d.names[t]}! Join our ${FORMATS[UI.active].label} cricket draft: ${PAGE_URL} . No login needed. Open the link and tap "This is me" on ${d.names[t]}'s squad. You pick when you're on the clock.`;}
+function smsHref(d,t){return `https://wa.me/${waDigits(PHONES[phoneKey(d.names[t])])}?text=${encodeURIComponent(inviteText(d,t))}`;}
+function inviteView(d,mine){
+  if(!canManage()||done(d)) return "";
+  const rows=d.order.filter(t=>t!==mine).map(t=>{const ph=PHONES[phoneKey(d.names[t])]||"";
+    return `<div class="inv"><div class="invname"><b>${esc(d.names[t])}</b>${seatOf(d,t)?' <span class="chip">Joined</span>':""}</div>
+      <input type="tel" id="phone${t}" inputmode="tel" autocomplete="off" placeholder="WhatsApp no. with country code" value="${esc(ph)}" aria-label="${esc(d.names[t])}'s phone number">
+      <div class="row" style="gap:6px"><a class="btn wa ${cleanPhone(ph)?"":"off"}" id="sms${t}" href="${esc(smsHref(d,t))}" target="_blank" rel="noopener">WhatsApp</a><button class="btn" data-copy="${t}">Copy message</button></div></div>`}).join("");
+  return `<details class="panel" id="invite" ${UI.invOpen!==false?"open":""}><summary><h3 style="display:inline">Invite friends</h3></summary>
+    <p class="muted small" style="margin:6px 0 10px">Numbers stay on this device only; your friends never see them. Enter WhatsApp numbers with the country code. <b>WhatsApp</b> opens a chat with that friend with the invite filled in. If nothing opens, use <b>Copy message</b> and paste it into any chat.</p>
+    <div class="invs">${rows}</div>
+    ${copyFallback?`<div class="field" style="margin-top:10px"><label for="copybox">Copy this message</label><textarea id="copybox" readonly rows="3">${esc(copyFallback)}</textarea></div>`:""}
+  </details>`;
+}
+function poolGroups(list,d,allowed,u){
+  if(!list.length) return '<p class="muted">No players match.</p>';
+  const groups=u.cat==="ALL"?CATS:CATS.filter(([c])=>c===u.cat);
+  return groups.map(([c,l])=>{const g=list.filter(p=>p.cat===c);if(!g.length)return "";
+    return `<div class="grp">${l} <span class="muted">· ${g.length}</span></div>${g.map(p=>playerRow(p,d,allowed)).join("")}`}).join("");
+}
+function squadView(d,t,now,mine){
+  const s=squad(d,t),tot=s.reduce((a,p)=>a+p.rating,0);
+  const mix=["BAT","WK","AR","BOWL"].map(r=>`${s.filter(p=>p.role===r).length} ${r}`).join(" · ");
+  let seat="";
+  if(MODE==="shared"){
+    const holder=seatOf(d,t);
+    if(holder&&holder===me) seat=`<span class="chip you">You</span>`;
+    else if(holder) seat=`<span class="chip">Claimed</span>${owner?` <button class="link" data-free="${t}">Free seat</button>`:""}`;
+    else if(mine===null&&me) seat=`<button class="btn tiny" data-claim="${t}">This is me</button>`;
+    else seat=`<span class="chip">Open seat</span>`;
+  }
+  return `<div class="sq ${now?"now":""}"><header><h3>${esc(d.names[t])} ${seat}</h3><span class="total" title="Sum of impact ratings">${tot}</span></header>
+    <div class="mix">${s.length}/${d.rounds} picked · ${mix}</div>
+    ${s.length?`<ol>${s.map(p=>`<li><b>${esc(p.name)}</b> <span class="muted">${p.role} · ${p.rating}</span></li>`).join("")}</ol>`:""}</div>`;
+}
+function teamScore(d,t){
+  const s=squad(d,t);let sc=s.reduce((a,p)=>a+p.rating,0);
+  const bowlers=s.filter(p=>p.role==="BOWL"||p.role==="AR").length, wk=s.some(p=>p.role==="WK");
+  const bonus=(bowlers>=Math.ceil(d.rounds/3)?10:0)+(wk?5:0);
+  return {sc,bonus,total:sc+bonus};
+}
+function resultsView(d){
+  const rows=d.order.map(t=>({t,...teamScore(d,t)})).sort((a,b)=>b.total-a.total);
+  return `<section class="panel"><h2>Who drafted best</h2><p class="muted small" style="margin:4px 0 12px">Squad impact total, plus 10 for enough bowling options (at least a third of the squad bowls) and 5 for having a wicketkeeper.</p>
+  <div class="results">${rows.map((r,j)=>`<div class="res"><div class="pos">${j+1}</div><div><b>${esc(d.names[r.t])}</b><div class="small" style="opacity:.8">${r.sc} impact + ${r.bonus} balance bonus</div></div><div class="total">${r.total}</div></div>`).join("")}</div></section>`;
+}
+function methodView(k){
+  const b=FORMATS[k].b;
+  return `<details class="panel method"><summary>How the impact rating works</summary>
+  <p>Each player's rating comes from their career ${FORMATS[k].label} numbers, compared with a typical good player in that format.</p>
+  <p><b>Batting impact</b> = (batting average ÷ ${b.bAvg}) × (strike rate ÷ ${b.sr})<sup>${b.srW}</sup>, scaled down for players with fewer than ${b.runsFull.toLocaleString()} career runs.</p>
+  <p><b>Bowling impact</b> = (${b.wAvg} ÷ bowling average) × (${b.econ} ÷ economy)<sup>${b.econW}</sup> × √(wickets per match ÷ ${b.wpm}), scaled down for fewer than ${b.wkFull} wickets.</p>
+  <p>The big number is the overall impact: the stronger skill counts in full and the other adds half. The best player in the format is set to 100, and squad totals use this number.</p><p>The pool is also ranked in three groups. Batters and wicketkeepers are ranked by batting impact, bowlers by bowling impact, and all-rounders by batting and bowling impact added together. A tag like <b>#3 bat</b> shows where a player stands in their group.</p>
+  <p class="muted">The stats are approximate career figures up to about the 2025 season, typed in by hand. Treat them as a first pass.</p></details>`;
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",e=>{
+  const wa=e.target.closest("a.wa");
+  if(wa){let msg="";try{msg=decodeURIComponent((wa.getAttribute("href").split("?text=")[1]||""));}catch(err){}
+    if(msg){try{navigator.clipboard.writeText(msg).then(()=>toast("Opening WhatsApp. If it doesn't open, the message is copied: open WhatsApp and paste it."),()=>{copyFallback=msg;toast("Opening WhatsApp. If it doesn't open, copy the message shown below.");});}catch(err){copyFallback=msg;render();}}
+    return;}
+  const t=e.target.closest("[data-copyname],[data-cat],[data-tab],[data-act],[data-pick],[data-claim],[data-free],[data-copy]"); if(!t) return;
+  const k=UI.active;
+  if(t.dataset.cat){UI.cat=t.dataset.cat;saveUI();render();return;}
+  if(t.dataset.tab){UI.active=t.dataset.tab;confirmNew=false;saveUI();render();return;}
+  if(t.dataset.copyname){const i=+t.dataset.copyname;const msg=msgFor(document.getElementById("name"+i).value.trim()||("Friend "+(i+1)));
+    try{navigator.clipboard.writeText(msg).then(()=>{copyFallback="";toast("Message copied. Paste it into a text or chat.");},()=>{copyFallback=msg;render();});}catch(err){copyFallback=msg;render();}
+    return;}
+  if(t.dataset.copy){const d=getDraft(k);if(!d)return;const msg=inviteText(d,+t.dataset.copy);
+    try{navigator.clipboard.writeText(msg).then(()=>{copyFallback="";toast("Invite copied. Paste it into a text or chat.");},()=>{copyFallback=msg;render();});}catch(err){copyFallback=msg;render();}
+    return;}
+  if(t.dataset.pick){run(()=>makePick(k,t.dataset.pick));return;}
+  if(t.dataset.claim){run(()=>claimSeat(k,+t.dataset.claim));return;}
+  if(t.dataset.free){run(()=>freeSeat(k,+t.dataset.free));return;}
+  const a=t.dataset.act;
+  if(a==="start"){
+    const names=Array.from({length:TEAMS},(_,i)=>(document.getElementById("name"+i).value.trim()||`Friend ${i+1}`));
+    lastNames=names;
+    const order=[0,1,2,3,4];
+    if(document.getElementById("shuffle").checked) for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+    const meSel=document.getElementById("me"); const seatIdx=meSel?+meSel.value:-1;
+    UI.q="";UI.cat="ALL";saveUI();
+    run(()=>startDraft(k,names,order,+document.getElementById("rounds").value,seatIdx));
+  }
+  if(a==="undo") run(()=>undo(k));
+  if(a==="new"){confirmNew=true;render();}
+  if(a==="cancel"){confirmNew=false;render();}
+  if(a==="reset"){confirmNew=false;run(()=>resetDraft(k));}
+});
+document.addEventListener("input",e=>{
+  if(e.target.id==="q"){UI.q=e.target.value;saveUI();render();}
+  if(/^(name|sphone)\d$/.test(e.target.id)){const i=+e.target.id.slice(-1);const n=document.getElementById("name"+i).value.trim()||("Friend "+(i+1));const pe=document.getElementById("sphone"+i);
+    if(e.target.id.startsWith("sphone")){PHONES[phoneKey(n)]=pe.value;savePhones();}
+    else if(PHONES[phoneKey(n)]&&!pe.value){pe.value=PHONES[phoneKey(n)];}
+    const a=document.getElementById("ssms"+i);if(a){a.href=smsFor(n,pe.value);a.classList.toggle("off",!cleanPhone(pe.value));}}
+  if(/^phone\d$/.test(e.target.id)){const t=+e.target.id.slice(5),d=getDraft(UI.active);if(!d)return;
+    PHONES[phoneKey(d.names[t])]=e.target.value;savePhones();
+    const a=document.getElementById("sms"+t);if(a){a.href=smsHref(d,t);a.classList.toggle("off",!cleanPhone(e.target.value));}}
+  if(/^name\d$/.test(e.target.id)){lastNames[+e.target.id.slice(4)]=e.target.value;const sel=document.getElementById("me");if(sel){const o=sel.options[+e.target.id.slice(4)+1];if(o)o.textContent=e.target.value||("Friend "+(+e.target.id.slice(4)+1));}}
+});
+document.addEventListener("toggle",e=>{if(e.target.id==="invite"){UI.invOpen=e.target.open;saveUI();}},true);
+document.addEventListener("change",e=>{
+  const id=e.target.id;
+  if(id==="sort"){UI[id]=e.target.value;saveUI();render();}
+  if(id==="hideTaken"){UI.hideTaken=e.target.checked;saveUI();render();}
+});
+boot();
+</script>
+</body></html>
