@@ -65,10 +65,10 @@ input[type=text],input[type=search],select{background:var(--bg);border:1px solid
 /* desk */
 .desk{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:860px){.desk{grid-template-columns:1fr}}
-.filters{display:grid;grid-template-columns:1fr auto;gap:8px;margin-block:12px}
+.filters{display:grid;grid-template-columns:1fr;gap:8px;margin-block:12px}
 @media (max-width:520px){.filters{grid-template-columns:1fr}}
 .pool{display:flex;flex-direction:column;max-height:70vh;overflow:auto;border-top:1px solid var(--line)}
-.p{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.p{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
 .p.taken{opacity:.42}
 .rating{font-family:var(--display);font-weight:700;font-size:1.45rem;text-align:center;border-radius:8px;background:var(--chip);padding:2px 0}
 .rating.elite{background:var(--pitch);color:var(--pitch-ink)}
@@ -127,6 +127,8 @@ h4{font-family:var(--display);font-size:1rem;font-weight:700;text-transform:uppe
 @media (max-width:620px){.nrow{grid-template-columns:1fr 1fr}.nrow .row{grid-column:1/-1}.nrow{padding-bottom:8px;border-bottom:1px solid var(--line)}}
 .nrow input[type=tel]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
 .btn.wa:not(.off){background:#1f8f4e;border-color:#1f8f4e;color:#fff}
+.pickform{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.pickform input{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0;font-size:1rem}
 </style>
 
 </head><body>
@@ -527,7 +529,8 @@ function getDraft(k){
 }
 function teamForPick(d,i){const r=Math.floor(i/TEAMS),pos=i%TEAMS;return d.order[r%2===0?pos:TEAMS-1-pos];}
 function done(d){return d.picks.length>=d.rounds*TEAMS;}
-function squad(d,t){return d.picks.filter(x=>x.team===t).map(x=>byId(x.pid)).filter(Boolean);}
+function normName(n){return String(n||"").trim().replace(/\s+/g," ");}
+function squad(d,t){return d.picks.filter(x=>x.team===t).map(x=>x.name);}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function seatOf(d,t){return MODE==="shared"&&d.seats?d.seats[t]||null:null;}
 function mySeat(d){if(MODE!=="shared"||!me||!d.seats)return null;for(const t in d.seats){if(d.seats[t]===me)return +t;}return null;}
@@ -546,9 +549,9 @@ function subscribeAll(){
         SUBS[k]={gid,unsub:()=>{}};
         if(gid&&/^[a-z0-9]+$/.test(gid)){
           SUBS[k].unsub=db.collection("games/"+gid+"/picks").onSnapshot(qs=>{
-            const list=qs.docs.map(x=>x.data()).filter(p=>p&&byId(p.pid)&&Number.isInteger(p.i)).sort((a,b)=>a.i-b.i);
+            const list=qs.docs.map(x=>x.data()).filter(p=>p&&typeof p.name==="string"&&normName(p.name)&&Number.isInteger(p.i)).sort((a,b)=>a.i-b.i);
             const seen=new Set(),clean=[];
-            for(const p of list){if(p.i!==clean.length||seen.has(p.pid))break;seen.add(p.pid);clean.push(p);}
+            for(const p of list){const key=normName(p.name).toLowerCase();if(p.i!==clean.length||seen.has(key))break;seen.add(key);clean.push(p);}
             PK[k]={gid,list:clean};render();
           },e=>{toast("Lost the live connection to the picks. Reload the page to reconnect.");});
         }
@@ -579,12 +582,14 @@ async function startDraft(k,names,order,rounds,seatIdx){
   if(MODE==="local"){LOCAL[k]={...d,picks:[]};saveLocal();render();return;}
   await db.doc("drafts/"+k).set(d);
 }
-async function makePick(k,pid){
+async function makePick(k,name){
+  name=normName(name).slice(0,40); if(!name){toast("Type a player name first.");return;}
   const d=getDraft(k); if(!d||done(d))return;
   const i=d.picks.length,team=teamForPick(d,i);
-  if(d.picks.some(x=>x.pid===pid)){toast("That player is already taken.");return;}
+  const taken=d.picks.find(x=>normName(x.name).toLowerCase()===name.toLowerCase());
+  if(taken){toast(name+" was already picked by "+d.names[taken.team]+".");return;}
   if(!canPickFor(d,team)){toast("It's "+d.names[team]+"'s pick. Wait for your turn.");return;}
-  const p={i,pid,team,by:me||"local"};
+  const p={i,name,team,by:me||"local"};
   if(MODE==="local"){d.picks.push(p);saveLocal();render();return;}
   const ref=db.doc("games/"+d.gameId+"/picks/p"+String(i).padStart(3,"0"));
   if(!(await ref.create(p))) toast("That pick was just made by someone else.");
@@ -633,7 +638,7 @@ function modeBanner(){
   return "";
 }
 function setupView(){
-  const k=UI.active,f=FORMATS[k],pool=POOLS[k],maxR=Math.floor(pool.length/TEAMS);
+  const k=UI.active,f=FORMATS[k],maxR=15;
   const shared=MODE==="shared";
   return `<section class="panel setup">
     <div class="field" style="gap:10px">
@@ -642,7 +647,6 @@ function setupView(){
       <div class="field"><label for="rounds">Players per squad</label>
         <select id="rounds">${Array.from({length:Math.min(maxR,15)-2},(_,i)=>i+3).map(n=>`<option ${n===Math.min(11,maxR)?"selected":""}>${n}</option>`).join("")}</select></div>
       <label class="row small"><input type="checkbox" id="shuffle" checked> Shuffle the pick order</label>
-      <div class="callout">${pool.length} ${f.label} players in the pool, ranked by an impact rating built from career stats.</div>
     </div>
     <div class="field" style="gap:10px">
       <h3>The five friends</h3>
@@ -660,7 +664,7 @@ function setupView(){
 }
 const CATNAME={BAT:"batters",BOWL:"bowlers",AR:"all-rounders"},CATSHORT={BAT:"bat",BOWL:"bowl",AR:"AR"};
 const CATS=[["BAT","Batters"],["BOWL","Bowlers"],["AR","All-rounders"]];
-function poolPreview(k){
+function poolPreview(k){ return "";
   return `<section class="panel"><h3>${FORMATS[k].label} rankings</h3>
   <div class="cols">${CATS.map(([c,l])=>`<div style="min-width:0"><h4>${l}</h4><div class="pool" style="max-height:none">${POOLS[k].filter(p=>p.cat===c).sort((a,b)=>a.catRank-b.catRank).slice(0,5).map(p=>playerRow(p,null,false)).join("")}</div></div>`).join("")}</div></section>`;
 }
@@ -675,9 +679,8 @@ function playerRow(p,d,canPick){
   const right = pick ? `<span class="pickedby">${esc(d.names[pick.team])}</span>` :
     (canPick?`<button class="btn" data-pick="${p.id}" ${busy?"disabled":""} aria-label="Pick ${esc(p.name)}">Pick</button>`:"");
   return `<div class="p ${pick?"taken":""}">
-    <div class="rating ${p.rating>=85?"elite":""}" title="Impact rating (bat ${p.batR}, bowl ${p.bowlR})">${p.rating}</div>
-    <div style="min-width:0"><span class="pname">${esc(p.name)}</span><span class="chips"><span class="chip rank" title="Rank among ${CATNAME[p.cat]}">#${p.catRank} ${CATSHORT[p.cat]}</span><span class="chip">${p.team}</span><span class="chip ${p.role}">${p.role}</span></span>
-      <div class="stats">${statLine(p)}</div></div>
+    <div style="min-width:0"><span class="pname">${esc(p.name)}</span><span class="chips"><span class="chip">${p.team}</span><span class="chip ${p.role}">${p.role}</span></span>
+</div>
     <div>${right}</div></div>`;
 }
 function draftView(d){
@@ -689,7 +692,7 @@ function draftView(d){
   let list=POOLS[k].filter(p=>(u.cat==="ALL"||p.cat===u.cat)&&(!u.q||p.name.toLowerCase().includes(u.q.toLowerCase())||p.team.toLowerCase()===u.q.toLowerCase()));
   if(u.hideTaken) list=list.filter(p=>!d.picks.some(x=>x.pid===p.id));
   const sorters={rank:(a,b)=>a.catRank-b.catRank||b.rating-a.rating,rating:(a,b)=>b.rating-a.rating,bat:(a,b)=>b.batR-a.batR,bowl:(a,b)=>b.bowlR-a.bowlR,name:(a,b)=>a.name.localeCompare(b.name)};
-  list.sort(sorters[u.sort]||sorters.rating);
+  list.sort(sorters.name);
   const rnd=Math.floor(i/TEAMS);
   const upcoming=fin?"":Array.from({length:TEAMS},(_,j)=>d.order[rnd%2===0?j:TEAMS-1-j]).map(t=>`<span class="${t===cur?"now":""}">${esc(d.names[t])}${t===mine?" (you)":""}</span>`).join("");
   const last=d.picks[d.picks.length-1];
@@ -703,7 +706,7 @@ function draftView(d){
     else sub="Waiting for them to pick. This page updates live.";
   }
   const clock = fin
-    ? `<div class="clock"><div><div class="meta">${f.label} draft complete</div><div class="who">Final standings</div></div>
+    ? `<div class="clock"><div><div class="meta">${f.label} draft complete</div><div class="who">Final squads</div></div>
         <div class="row">${canUndo?`<button class="btn" data-act="undo">Undo last pick</button>`:""}${canManage()?`<button class="btn" data-act="new">New ${f.label} draft</button>`:""}</div></div>`
     : `<div class="clock ${yourTurn?"mine":""}"><div><div class="meta">Round ${rnd+1} of ${d.rounds} · pick ${i+1} of ${total}</div>
         <div class="who">${who}</div>${sub?`<div class="meta" style="margin-top:2px">${sub}</div>`:""}<div class="order" style="margin-top:6px">${upcoming}</div></div>
@@ -711,22 +714,18 @@ function draftView(d){
   const conf = confirmNew ? `<div class="panel callout row" style="justify-content:space-between"><span>Start over? This clears the ${f.label} draft and all ${d.picks.length} picks${MODE==="shared"?" for everyone":""}.</span>
      <span class="row"><button class="btn danger" data-act="reset">Clear and start over</button><button class="btn" data-act="cancel">Keep this draft</button></span></div>` : "";
   const join = (MODE==="shared"&&mine===null&&!fin&&d.order.some(t=>!seatOf(d,t))) ? `<div class="banner">Playing in this draft? Tap <b>This is me</b> on your squad below so only you can make your picks.</div>`:"";
-  return `${clock}${conf}${join}${inviteView(d,mine)}${fin?resultsView(d):""}
+  return `${clock}${conf}${join}${inviteView(d,mine)}
   <div class="desk">
     <section class="panel" style="min-width:0">
-      <div class="row" style="justify-content:space-between"><h2>Player pool</h2><span class="muted small">${list.length} shown</span></div>
-      <div class="seg" role="tablist" aria-label="Player type">${[["ALL","All"],...CATS].map(([c,l])=>`<button role="tab" aria-selected="${u.cat===c}" data-cat="${c}">${l}</button>`).join("")}</div>
-      <div class="filters">
-        <input type="search" id="q" placeholder="Search name or team (e.g. CSK, IND)" value="${esc(u.q)}" aria-label="Search players">
-        <select id="sort" aria-label="Sort">${[["rank","Ranking"],["rating","Impact"],["bat","Batting"],["bowl","Bowling"],["name","Name"]].map(([v,l])=>`<option value="${v}" ${u.sort===v?"selected":""}>Sort: ${l}</option>`).join("")}</select>
-      </div>
-      <label class="row small muted" style="margin-bottom:8px"><input type="checkbox" id="hideTaken" ${u.hideTaken?"checked":""}> Hide players already picked</label>
-      <div class="pool">${poolGroups(list,d,allowed,u)}</div>
+      <h2>Make a pick</h2>
+      ${fin?`<p class="muted">The draft is over. All squads are full.</p>`:allowed?`<p class="muted small" style="margin:6px 0 10px">Type the player ${yourTurn?"you want":"for "+esc(d.names[cur])} and tap Pick. Each player can only be picked once.</p>
+      <form class="pickform" id="pickform" autocomplete="off"><input type="text" id="pickname" maxlength="40" placeholder="Player name" aria-label="Player name"><button class="btn primary" type="submit" ${busy?"disabled":""}>Pick</button></form>`
+      :`<p class="muted">Waiting for ${esc(d.names[cur])} to pick. This page updates live.</p>`}
     </section>
     <section style="min-width:0;display:flex;flex-direction:column;gap:12px">
       <h2>Squads</h2>
       <div class="squads">${d.order.map(t=>squadView(d,t,t===cur,mine)).join("")}</div>
-      <div class="panel"><h3>Pick log</h3><div class="log" style="margin-top:6px">${d.picks.map((x,j)=>`<div>${j+1}. ${esc(d.names[x.team])} took ${esc(byId(x.pid).name)}</div>`).join("")||"<div>No picks yet.</div>"}</div></div>
+      <div class="panel"><h3>Pick log</h3><div class="log" style="margin-top:6px">${d.picks.map((x,j)=>`<div>${j+1}. ${esc(d.names[x.team])} took ${esc(x.name)}</div>`).join("")||"<div>No picks yet.</div>"}</div></div>
     </section>
   </div>${methodView(k)}`;
 }
@@ -743,7 +742,7 @@ function inviteView(d,mine){
     return `<div class="inv"><div class="invname"><b>${esc(d.names[t])}</b>${seatOf(d,t)?' <span class="chip">Joined</span>':""}</div>
       <input type="tel" id="phone${t}" inputmode="tel" autocomplete="off" placeholder="WhatsApp no. with country code" value="${esc(ph)}" aria-label="${esc(d.names[t])}'s phone number">
       <div class="row" style="gap:6px"><a class="btn wa ${cleanPhone(ph)?"":"off"}" id="sms${t}" href="${esc(smsHref(d,t))}" target="_blank" rel="noopener">WhatsApp</a><button class="btn" data-copy="${t}">Copy message</button></div></div>`}).join("");
-  return `<details class="panel" id="invite" ${UI.invOpen!==false?"open":""}><summary><h3 style="display:inline">Invite friends</h3></summary>
+  return `<details class="panel" id="invite" ${UI.invOpen===true?"open":""}><summary><h3 style="display:inline">Invite friends</h3></summary>
     <p class="muted small" style="margin:6px 0 10px">Numbers stay on this device only; your friends never see them. Enter WhatsApp numbers with the country code. <b>WhatsApp</b> opens a chat with that friend with the invite filled in. If nothing opens, use <b>Copy message</b> and paste it into any chat.</p>
     <div class="invs">${rows}</div>
     ${copyFallback?`<div class="field" style="margin-top:10px"><label for="copybox">Copy this message</label><textarea id="copybox" readonly rows="3">${esc(copyFallback)}</textarea></div>`:""}
@@ -756,8 +755,7 @@ function poolGroups(list,d,allowed,u){
     return `<div class="grp">${l} <span class="muted">· ${g.length}</span></div>${g.map(p=>playerRow(p,d,allowed)).join("")}`}).join("");
 }
 function squadView(d,t,now,mine){
-  const s=squad(d,t),tot=s.reduce((a,p)=>a+p.rating,0);
-  const mix=["BAT","WK","AR","BOWL"].map(r=>`${s.filter(p=>p.role===r).length} ${r}`).join(" · ");
+  const s=squad(d,t);
   let seat="";
   if(MODE==="shared"){
     const holder=seatOf(d,t);
@@ -766,9 +764,9 @@ function squadView(d,t,now,mine){
     else if(mine===null&&me) seat=`<button class="btn tiny" data-claim="${t}">This is me</button>`;
     else seat=`<span class="chip">Open seat</span>`;
   }
-  return `<div class="sq ${now?"now":""}"><header><h3>${esc(d.names[t])} ${seat}</h3><span class="total" title="Sum of impact ratings">${tot}</span></header>
-    <div class="mix">${s.length}/${d.rounds} picked · ${mix}</div>
-    ${s.length?`<ol>${s.map(p=>`<li><b>${esc(p.name)}</b> <span class="muted">${p.role} · ${p.rating}</span></li>`).join("")}</ol>`:""}</div>`;
+  return `<div class="sq ${now?"now":""}"><header><h3>${esc(d.names[t])} ${seat}</h3></header>
+    <div class="mix">${s.length}/${d.rounds} picked</div>
+    ${s.length?`<ol>${s.map(p=>`<li>${esc(p)}</li>`).join("")}</ol>`:""}</div>`;
 }
 function teamScore(d,t){
   const s=squad(d,t);let sc=s.reduce((a,p)=>a+p.rating,0);
@@ -781,7 +779,7 @@ function resultsView(d){
   return `<section class="panel"><h2>Who drafted best</h2><p class="muted small" style="margin:4px 0 12px">Squad impact total, plus 10 for enough bowling options (at least a third of the squad bowls) and 5 for having a wicketkeeper.</p>
   <div class="results">${rows.map((r,j)=>`<div class="res"><div class="pos">${j+1}</div><div><b>${esc(d.names[r.t])}</b><div class="small" style="opacity:.8">${r.sc} impact + ${r.bonus} balance bonus</div></div><div class="total">${r.total}</div></div>`).join("")}</div></section>`;
 }
-function methodView(k){
+function methodView(k){ return "";
   const b=FORMATS[k].b;
   return `<details class="panel method"><summary>How the impact rating works</summary>
   <p>Each player's rating comes from their career ${FORMATS[k].label} numbers, compared with a typical good player in that format.</p>
@@ -836,6 +834,7 @@ document.addEventListener("input",e=>{
     const a=document.getElementById("sms"+t);if(a){a.href=smsHref(d,t);a.classList.toggle("off",!cleanPhone(e.target.value));}}
   if(/^name\d$/.test(e.target.id)){lastNames[+e.target.id.slice(4)]=e.target.value;const sel=document.getElementById("me");if(sel){const o=sel.options[+e.target.id.slice(4)+1];if(o)o.textContent=e.target.value||("Friend "+(+e.target.id.slice(4)+1));}}
 });
+document.addEventListener("submit",e=>{if(e.target.id==="pickform"){e.preventDefault();const v=document.getElementById("pickname").value;run(()=>makePick(UI.active,v));}});
 document.addEventListener("toggle",e=>{if(e.target.id==="invite"){UI.invOpen=e.target.open;saveUI();}},true);
 document.addEventListener("change",e=>{
   const id=e.target.id;
